@@ -95,7 +95,7 @@ def show():
         best_plan = None
         best_score = 999
 
-        for pct in np.arange(0.6, 1.05, 0.05):
+        for pct in np.arange(0.3, 1.05, 0.05):
             for alt_tenure in [24, 36, 48, 60, 72, 84, 96, 120]:
 
                 alt_amount = round(loan_amount * pct / 10000) * 10000
@@ -109,7 +109,7 @@ def show():
 
                 alt_level, _, _ = get_risk_level(alt_score)
 
-                if alt_level == "Low Risk" and alt_score < best_score:
+                if alt_score < best_score:
                     best_score = alt_score
                     best_plan = {
                         "amount": alt_amount,
