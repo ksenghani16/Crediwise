@@ -1,87 +1,87 @@
 import streamlit as st
 
 st.set_page_config(
-    page_title="LoanAdvisor",
-    page_icon="📈",
+    page_title="Crediwise — AI Loan Intelligence",
+    page_icon="💜",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
 
-# Custom CSS for the entire app
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-    
-    * { font-family: 'DM Sans', sans-serif; }
-    
-    .stApp { background-color: #f8f7f4; }
-    
-    .main-header {
-        background: white;
-        padding: 1rem 2rem;
-        border-bottom: 1px solid #e8e4df;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    
-    .metric-card {
-        background: white;
-        border-radius: 12px;
-        padding: 1.2rem;
-        border: 1px solid #e8e4df;
-    }
-    
-    .risk-badge-high { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
-    .risk-badge-medium { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
-    .risk-badge-low { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
-    
-    div[data-testid="stButton"] > button {
-        background: #1a1a1a;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.6rem 1.5rem;
-        font-weight: 500;
-        width: 100%;
-    }
-    div[data-testid="stButton"] > button:hover { background: #333; }
-    
-    .stNumberInput input { border-radius: 8px; border: 1.5px solid #e8e4df; }
-    .stSelectbox select { border-radius: 8px; }
-    
-    #MainMenu, footer, header { visibility: hidden; }
-</style>
-""", unsafe_allow_html=True)
+# ── Import global styles ──
+from utils.styles import GLOBAL_CSS, NAVBAR_CSS
 
-# Navigation
-if "page" not in st.session_state:
-    st.session_state.page = "home"
-if "form_data" not in st.session_state:
-    st.session_state.form_data = {}
+st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
+st.markdown(NAVBAR_CSS, unsafe_allow_html=True)
 
-col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-with col1:
-    st.markdown("### 📈 LoanAdvisor")
-with col2:
-    if st.button("🏠 Home"):
+# ── Session state defaults ──
+if "page"      not in st.session_state: st.session_state.page      = "home"
+if "form_data" not in st.session_state: st.session_state.form_data = {}
+
+# ──────────────────────────────────────────────────
+# NAVBAR
+# ──────────────────────────────────────────────────
+active = st.session_state.page
+
+nav_left, nav_mid, nav_right = st.columns([3, 5, 4])
+
+with nav_left:
+    st.markdown("""
+    <div class="cw-logo">
+        Crediwise
+        <span>AI Loan Intelligence · India</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+with nav_mid:
+    n1, n2, n3 = st.columns(3)
+    clicked_home = n1.button(
+        "🏠  Home", key="nav_home", use_container_width=True,
+        type="primary" if active == "home" else "secondary",
+    )
+    clicked_calc = n2.button(
+        "🧮  Calculator", key="nav_calculator", use_container_width=True,
+        type="primary" if active == "calculator" else "secondary",
+    )
+    clicked_dash = n3.button(
+        "📊  Dashboard", key="nav_dashboard", use_container_width=True,
+        type="primary" if active == "dashboard" else "secondary",
+    )
+
+    if clicked_home:
         st.session_state.page = "home"
-with col3:
-    if st.button("🧮 Calculator"):
+        st.rerun()
+    if clicked_calc:
         st.session_state.page = "calculator"
-with col4:
-    if st.button("📊 Dashboard"):
-        st.session_state.page = "dashboard"
+        st.rerun()
+    if clicked_dash:
+        st.session_state.page = "dashboard" if st.session_state.form_data.get("income") else "calculator"
+        st.rerun()
 
-st.divider()
+with nav_right:
+    has_data = bool(st.session_state.form_data.get("income") and st.session_state.form_data.get("loan_amount"))
+    status_color = "#10d9a0" if has_data else "#4b6080"
+    status_text  = "Analysis ready" if has_data else "No analysis yet"
+    st.markdown(f"""
+    <div style="text-align:right; padding-top:0.65rem;">
+        <span style="font-size:0.78rem; color:{status_color}; font-weight:600;">● {status_text}</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-# Route pages
-if st.session_state.page == "home":
+st.markdown("<hr style='margin:0.4rem 0 1.5rem; opacity:0.2;'>", unsafe_allow_html=True)
+
+# ──────────────────────────────────────────────────
+# ROUTING
+# ──────────────────────────────────────────────────
+page = st.session_state.page
+
+if page == "home":
     from pages.home import show
     show()
-elif st.session_state.page == "calculator":
+
+elif page == "calculator":
     from pages.calculator import show
     show()
-elif st.session_state.page == "dashboard":
+
+elif page == "dashboard":
     from pages.dashboard import show
     show()
