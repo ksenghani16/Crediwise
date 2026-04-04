@@ -11,7 +11,7 @@ def show():
     .calc-hero h2 {
         font-family: 'Syne', sans-serif;
         font-size: 2rem; font-weight: 800;
-        color: #f0f4ff; letter-spacing: -0.03em; margin: 0 0 0.45rem;
+        color: #1560bd; letter-spacing: -0.03em; margin: 0 0 0.45rem;
     }
     .calc-hero p { color: #94a3b8; font-size: 0.96rem; margin: 0; }
 
