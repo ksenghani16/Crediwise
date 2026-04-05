@@ -34,20 +34,6 @@ def show():
         padding:2.5rem 2.2rem;
         box-shadow:0 8px 40px rgba(0,51,153,0.09);
     }
-    .stat-chip {
-        text-align:center;
-        background:rgba(255,255,255,0.78);
-        border:1px solid rgba(144,202,249,0.4);
-        border-radius:14px; padding:1.2rem 1rem;
-    }
-    .stat-chip-val {
-        font-family:'Merriweather',serif;
-        font-size:1.6rem; font-weight:900; color:#003399; line-height:1;
-    }
-    .stat-chip-lbl {
-        font-size:0.73rem; color:#64748b; font-weight:600;
-        text-transform:uppercase; letter-spacing:0.06em; margin-top:4px;
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -64,13 +50,9 @@ def show():
 
     st.markdown("<div style='padding:2.5rem 3rem;'>", unsafe_allow_html=True)
 
-    # Stats row
-    
-
     form_col, tips_col = st.columns([1.4, 1], gap="large")
 
     with form_col:
-        
         st.markdown(
             "<div style='font-family:Merriweather,serif;font-size:1.15rem;"
             "font-weight:800;color:#1a2540;margin-bottom:0.3rem;'>"
@@ -146,11 +128,35 @@ def show():
                     st.warning("Please consent to data usage to submit your feedback.")
                 else:
                     first = name.split()[0]
-                    if email and follow_up:
-                        followup_note = "We will follow up at " + email + " within 48 hours."
-                    else:
-                        followup_note = "We appreciate you taking the time to share your thoughts!"
-                    st.success("Thank you, " + first + "! Your feedback has been received. " + followup_note)
+                    followup_note = (
+                        f"We will follow up at {email} within 48 hours."
+                        if (email and follow_up)
+                        else "We appreciate you taking the time to share your thoughts!"
+                    )
+
+                    # ── Email integration ──────────────────────────────────────
+                    try:
+                        from utils.email_sender import send_feedback_notification, is_email_configured
+                        if is_email_configured():
+                            ok, err = send_feedback_notification(
+                                name=name, email=email, fb_type=fb_type,
+                                rating=rating, nps=nps, message=message,
+                                features=features_used,
+                            )
+                            if not ok:
+                                # Silent failure — don't alarm the user
+                                pass
+                        else:
+                            # Dev note only (won't show in production if email is configured)
+                            st.info(
+                                "📌 **Dev note:** Email not configured. "
+                                "Add `CREDIWISE_EMAIL` + `CREDIWISE_EMAIL_PASSWORD` to `.env` "
+                                "to receive feedback notifications. See `utils/email_sender.py`."
+                            )
+                    except ImportError:
+                        pass
+
+                    st.success(f"Thank you, {first}! Your feedback has been received. {followup_note}")
                     st.balloons()
 
         st.markdown("</div>", unsafe_allow_html=True)
@@ -214,8 +220,6 @@ def show():
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-       
 
         st.markdown("</div>", unsafe_allow_html=True)
 
