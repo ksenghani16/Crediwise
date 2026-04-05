@@ -13,6 +13,7 @@ from utils.calculator import (
 )
 from utils.risk_engine import compute_risk_score, get_risk_level
 from utils.explainer import explain_risk
+from utils.report_generator import generate_report
 
 
 # ── Plotly layout — light theme ───────────────────────────────────────────────
@@ -76,28 +77,19 @@ def ml_default_probability(model, income, loan_amt, interest_rate, credit_histor
         return None
 
 
-# FIX 1: Normalize ml_prob to 0-100 before blending
-# Old: ml_prob * 60 + rule_score * 0.4  (ml maxed at 60, not 100)
-# New: ml_prob * 100 * 0.6 + rule_score * 0.4  (both properly weighted)
 def blended_risk_score(rule_score: int, ml_prob) -> int:
     if ml_prob is None:
         return rule_score
-    ml_score = ml_prob * 100          # normalize probability 0–1 → 0–100
+    ml_score = ml_prob * 100
     blended  = ml_score * 0.6 + rule_score * 0.4
     return int(min(100, max(0, blended)))
 
 
-# FIX 2: Rewritten compute_all_plans with correct ML Pick logic
-# Old: looped tenures, same ml_prob for all → longest tenure always won (lower debt ratio)
-# New: ml_prob is computed ONCE (it doesn't vary by tenure), tenure selection uses
-#      smart rules: prefer shorter tenure that saves interest & stays affordable;
-#      only suggest longer tenure if it gives 5+ point risk improvement
 @st.cache_data
 def compute_all_plans(income, expenses, existing_emi, loan_amount, tenure,
                       interest_rate, credit_score, credit_history, savings, _ml_active):
     model = load_ml_model()
 
-    # ML probability is fixed for this borrower profile — tenure doesn't affect it
     ml_prob   = ml_default_probability(model, income, loan_amount, interest_rate, credit_history)
     user_rule = compute_risk_score(income, expenses, existing_emi, loan_amount, tenure,
                                    interest_rate, credit_score, credit_history, savings)
@@ -110,43 +102,39 @@ def compute_all_plans(income, expenses, existing_emi, loan_amount, tenure,
 
     best_plan = None
 
-    # Priority 1: Find a SHORTER tenure that saves interest and stays affordable
     for t in sorted(TENURE_OPTIONS):
         if t >= tenure:
-            continue                        # only consider shorter tenures here
+            continue
         candidate_emi  = calculate_emi(loan_amount, interest_rate, t)
         candidate_rule = compute_risk_score(income, expenses, existing_emi, loan_amount, t,
                                             interest_rate, credit_score, credit_history, savings)
         candidate_risk = blended_risk_score(candidate_rule, ml_prob)
         candidate_int  = calculate_total_interest(loan_amount, candidate_emi, t)
 
-        emi_affordable    = candidate_emi <= safe_emi * 1.1   # 10% buffer on safe EMI
-        saves_interest    = candidate_int < user_int           # strictly cheaper overall
-        doesnt_raise_risk = candidate_risk <= user_risk        # must not worsen risk
+        emi_affordable    = candidate_emi <= safe_emi * 1.1
+        saves_interest    = candidate_int < user_int
+        doesnt_raise_risk = candidate_risk <= user_risk
 
         if emi_affordable and saves_interest and doesnt_raise_risk:
             best_plan = (loan_amount, t, candidate_emi, candidate_risk)
-            break   # take the shortest valid tenure
+            break
 
-    # Priority 2: Try a LONGER tenure — only if it meaningfully cuts risk by 5+ points
     if best_plan is None:
         for t in sorted(TENURE_OPTIONS, reverse=True):
             if t <= tenure:
-                continue                    # only consider longer tenures here
+                continue
             candidate_emi  = calculate_emi(loan_amount, interest_rate, t)
             candidate_rule = compute_risk_score(income, expenses, existing_emi, loan_amount, t,
                                                 interest_rate, credit_score, credit_history, savings)
             candidate_risk = blended_risk_score(candidate_rule, ml_prob)
 
             emi_affordable  = candidate_emi <= safe_emi * 1.1
-            # Must drop risk by at least 5 points to justify paying more interest
             meaningful_risk = (user_risk - candidate_risk) >= 5
 
             if emi_affordable and meaningful_risk:
                 best_plan = (loan_amount, t, candidate_emi, candidate_risk)
                 break
 
-    # Priority 3: Fallback — no better option found, return user's own plan
     if best_plan is None:
         best_plan = (loan_amount, tenure, user_emi, user_risk)
 
@@ -172,7 +160,6 @@ def build_amortization_schedule(principal: float, annual_rate: float, tenure_mon
             "principal_component": round(principal_c, 2),
             "interest_component":  round(interest_c, 2),
             "closing_balance":     round(balance, 2),
-            # FIX 5 (part 1): Store original interest component for accurate savings calc
             "original_interest":   round(interest_c, 2),
             "paid_amount": None, "status": "future",
             "interest_saved": 0.0, "months_reduced": 0,
@@ -268,7 +255,6 @@ def show():
     ml_model  = load_ml_model()
     ml_active = ml_model is not None
 
-    # Show ML error if model loaded but predict_proba failed silently
     if st.session_state.get("ml_error"):
         st.warning(f"⚠️ ML model loaded but prediction failed: {st.session_state['ml_error']}")
 
@@ -278,6 +264,26 @@ def show():
     )
     risk_level, risk_color, risk_bg, risk_icon = get_risk_level(risk_score)
 
+    # ── SAVE SESSION TO DB (for profile history) ──────────────────────────────
+    # Save once per unique analysis (keyed by form_data hash)
+    _save_key = f"_saved_{hash(str(sorted(data.items())))}"
+    if not st.session_state.get(_save_key):
+        try:
+            from utils.database import save_session
+            user_email = st.session_state.get("user_email", "")
+            save_session(
+                data       = data,
+                risk_score = risk_score,
+                risk_level = risk_level,
+                emi        = emi,
+                safe_emi   = safe_emi,
+                max_loan   = max_loan,
+                user_email = user_email,
+            )
+            st.session_state[_save_key] = True
+        except Exception:
+            pass  # silent — don't break the dashboard if DB fails
+
     # ── Build plan cards ──────────────────────────────────────────────────────
     plan_cards = []
 
@@ -285,7 +291,6 @@ def show():
         e_amt, e_ten, e_emi, e_risk = exact_plan
         _, e_col, e_bg, _ = get_risk_level(e_risk)
 
-        # FIX 3: Badge text reflects actual outcome, not always "ML Recommended"
         same_as_user = (e_ten == tenure)
         risk_drop    = risk_score - e_risk
         e_int        = calculate_total_interest(e_amt, e_emi, e_ten)
@@ -336,7 +341,7 @@ def show():
                  else plan_cards[1])
     active_label = active_pc["label"]
 
-    # ── CSS — light theme (matches existing dashboard) ────────────────────────
+    # ── CSS ───────────────────────────────────────────────────────────────────
     st.markdown("""
     <style>
     .db-wrap { padding: 2rem 2.5rem; }
@@ -350,7 +355,6 @@ def show():
     }
     .db-header .sub { font-size: 0.88rem; color: #475569; font-weight: 500; }
 
-    /* ML badge */
     .ml-badge {
         display: inline-flex; align-items: center; gap: 0.4rem;
         padding: 0.35rem 1rem; border-radius: 100px;
@@ -364,7 +368,6 @@ def show():
         border-color: rgba(245,158,11,0.35);
     }
 
-    /* Risk banner */
     .risk-banner {
         border-radius: 18px; padding: 1.6rem 2rem;
         display: flex; align-items: center; gap: 2rem;
@@ -386,7 +389,6 @@ def show():
         flex-shrink:0; white-space:nowrap; font-family:'Plus Jakarta Sans',sans-serif;
     }
 
-    /* KPI strip */
     .kpi-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.6rem; }
     .kpi-card {
         background:rgba(255,255,255,0.82); backdrop-filter:blur(12px);
@@ -406,20 +408,17 @@ def show():
     .kpi-sub { font-size:0.76rem; color:#64748b; margin-top:0.2rem; font-weight:500; }
     .kpi-icon { position:absolute; top:1rem; right:1rem; font-size:1.3rem; opacity:0.35; }
 
-    /* Section title */
     .sec-title {
         font-family:'Merriweather',serif; font-size:0.95rem; font-weight:800;
         color:#1a2540; margin:0 0 1rem;
         display:flex; align-items:center; gap:0.5rem;
     }
 
-    /* Score factor bars */
     .factor-name { font-size:0.82rem; color:#334155; font-weight:600; }
     .factor-val  { font-size:0.82rem; font-weight:700; }
     .factor-bar-bg { height:9px; background:rgba(144,202,249,0.25); border-radius:5px; overflow:hidden; margin-top:5px; }
     .factor-bar-fill { height:100%; border-radius:5px; transition:width 0.4s; }
 
-    /* Explainer cards */
     .exp-card {
         border-radius:12px; padding:0.9rem 1.1rem;
         margin-bottom:0.75rem; border-left:4px solid;
@@ -430,7 +429,6 @@ def show():
     .exp-medium { background:rgba(254,243,199,0.8); border-color:#f59e0b; color:#92400e; }
     .exp-low    { background:rgba(220,252,231,0.8); border-color:#22c55e; color:#166534; }
 
-    /* Plan suggestion cards */
     .plan-card-wrap {
         background:rgba(255,255,255,0.82); backdrop-filter:blur(12px);
         border:1.5px solid rgba(144,202,249,0.4); border-radius:18px;
@@ -457,7 +455,6 @@ def show():
     .plan-row .pr-l { color:#475569; font-weight:500; }
     .plan-row .pr-v { font-weight:700; color:#1a2540; font-family:'Merriweather',serif; }
 
-    /* Active plan banner */
     .active-plan-banner {
         background:rgba(219,234,254,0.8); border:1px solid rgba(59,130,246,0.3);
         border-radius:12px; padding:0.9rem 1.2rem; margin-bottom:1.2rem;
@@ -465,7 +462,6 @@ def show():
         display:flex; align-items:center; gap:0.6rem;
     }
 
-    /* Risk reduction panel */
     .rrp {
         background:rgba(220,252,231,0.6); border:1px solid rgba(34,197,94,0.3);
         border-radius:18px; padding:1.8rem 2rem; margin-top:1.2rem;
@@ -492,7 +488,6 @@ def show():
                      text-transform:uppercase; letter-spacing:0.06em; font-weight:700; }
     .rrp-sav-val   { font-family:'Merriweather',serif; font-size:1rem; font-weight:900; color:#1a2540; }
 
-    /* Debt ratio summary box */
     .debt-box {
         margin-top:1.1rem; padding:1rem 1.2rem;
         background:rgba(255,255,255,0.85); border:1px solid rgba(144,202,249,0.4);
@@ -503,14 +498,12 @@ def show():
     .debt-box-val { font-family:'Merriweather',serif; font-size:1.5rem; font-weight:900; line-height:1.1; }
     .debt-box-sub { font-size:0.78rem; color:#64748b; margin-top:0.15rem; }
 
-    /* Stress note boxes */
     .stress-note {
         padding:1rem 1.3rem; border-radius:12px;
         font-size:0.87rem; line-height:1.65; font-weight:500;
         font-family:'Plus Jakarta Sans',sans-serif; margin-top:0.8rem;
     }
 
-    /* Comparison metric cards */
     .cmp-card {
         background:rgba(255,255,255,0.82); border:1px solid rgba(144,202,249,0.4);
         border-radius:16px; padding:1rem; text-align:center;
@@ -522,7 +515,6 @@ def show():
     .cmp-row-val { font-family:'Merriweather',serif; font-size:0.92rem;
                    font-weight:800; color:#1a2540; margin-bottom:0.4rem; }
 
-    /* Tracker */
     .tracker-summary { display:grid; grid-template-columns:repeat(5,1fr); gap:0.8rem; margin-bottom:1.4rem; }
     .tracker-card {
         background:rgba(255,255,255,0.82); border:1px solid rgba(144,202,249,0.4);
@@ -549,7 +541,6 @@ def show():
     .alert-info    { background:rgba(219,234,254,0.8); border-color:rgba(59,130,246,0.35); color:#1e40af; }
     .alert-warning { background:rgba(254,243,199,0.8); border-color:rgba(245,158,11,0.35); color:#92400e; }
 
-    /* Tabs */
     div[data-testid="stTabs"] button {
         font-family:'Plus Jakarta Sans',sans-serif !important;
         font-weight:600 !important; color:#475569 !important;
@@ -570,7 +561,6 @@ def show():
     </div>
     """, unsafe_allow_html=True)
 
-    # ML badge
     if ml_active:
         ml_label = "🤖 ML Model Active — Risk scores powered by Random Forest trained on 28,000+ real credit records"
         ml_cls   = "ml-badge"
@@ -628,6 +618,52 @@ def show():
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+    # ── Download Report ───────────────────────────────────────────────────────
+    """"
+    dl_col, _ = st.columns([1, 3])
+    with dl_col:
+        try:
+            report_data = {
+                "income":          income,
+                "expenses":        expenses,
+                "existing_emi":    existing_emi,
+                "savings":         savings,
+                "credit_score":    credit_score,
+                "credit_history":  credit_history,
+                "loan_amount":     loan_amount,
+                "tenure":          tenure,
+                "interest_rate":   interest_rate,
+                "loan_type":       loan_type,
+                "employment":      employment,
+                "emi":             emi,
+                "safe_emi":        safe_emi,
+                "max_loan":        max_loan,
+                "total_interest":  total_int,
+                "debt_ratio":      debt_ratio,
+                "emi_ratio":       emi_ratio,
+                "risk_score":      risk_score,
+                "risk_level":      risk_level,
+                "plan_label":      (plan_cards[0]["label"]    if plan_cards[0] else "Your Plan"),
+                "plan_amount":     (plan_cards[0]["amount"]   if plan_cards[0] else loan_amount),
+                "plan_tenure":     (plan_cards[0]["tenure"]   if plan_cards[0] else tenure),
+                "plan_emi":        (plan_cards[0]["emi"]      if plan_cards[0] else emi),
+                "plan_interest":   (plan_cards[0]["interest"] if plan_cards[0] else total_int),
+                "plan_risk":       (plan_cards[0]["risk"]     if plan_cards[0] else risk_score),
+                "username":        st.session_state.get("username", ""),
+            }
+            pdf_bytes = generate_report(report_data)
+            st.download_button(
+                label="📄 Download Full Report (PDF)",
+                data=pdf_bytes,
+                file_name=f"crediwise_report_{loan_type.replace(' ', '_').lower()}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                type="secondary",
+            )
+        except Exception as _rpt_err:
+            st.warning(f"PDF generation failed: {_rpt_err}")
+            """
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
     tab1, tab2, tab4, tab5, tab6 = st.tabs([
@@ -771,7 +807,6 @@ def show():
     with tab4:
         st.markdown('<div class="sec-title"> Plan Suggestions</div>', unsafe_allow_html=True)
 
-        # FIX 4: Honest explanation of what ML actually does vs rule engine
         if ml_active:
             st.markdown(
                 f'<div class="alert-box alert-info" style="margin-bottom:1.2rem;">'
@@ -911,9 +946,6 @@ def show():
                         <strong>Keep Your Plan</strong> if minimising total interest paid matters more.
                     </div>
                 </div>""", unsafe_allow_html=True)
-
-            # Bar charts from Code 2 (kept as-is)
-            
         else:
             st.markdown(
                 '<div class="alert-box alert-info" style="margin-top:1rem;">'
@@ -969,7 +1001,7 @@ def show():
         st.markdown("<br>", unsafe_allow_html=True)
 
         _, cmp_nc, _, _ = get_risk_level(cmp_pc["risk"])
-       
+
         if saving_diff > 0:
             st.markdown(f"""
             <div style="padding:1.2rem 1.5rem;background:rgba(220,252,231,0.8);
@@ -1014,7 +1046,6 @@ def show():
             'Pay <strong>less</strong> → future EMIs increase. Schedule recalculates live.</div>',
             unsafe_allow_html=True)
 
-        # Plan selector
         plan_options_map = {"Your Original Plan": (loan_amount, tenure, emi)}
         if plan_cards[0] is not None:
             pc0      = plan_cards[0]
@@ -1057,9 +1088,6 @@ def show():
         outstanding        = (schedule[months_completed - 1]["closing_balance"]
                               if months_completed > 0 else track_amount)
 
-        # FIX 5: interest_saved_so_far — only compare logged months vs their original projection
-        # Old: compared original_total_int vs ALL rows (including future), always near zero
-        # New: sum actual interest paid on logged months vs what was originally scheduled for those months
         actual_interest_paid    = sum(r["interest_component"]
                                       for r in schedule if r["status"] != "future")
         original_interest_those = sum(r.get("original_interest", r["interest_component"])
@@ -1145,14 +1173,10 @@ def show():
                 if st.button("Log ✓", key=f"log_btn_m{next_unpaid}_{selected_plan_name}",
                              type="primary", use_container_width=True):
                     if payment_input == 0:
-                        # FIX 6: Don't manually mutate future balances before recalculate
-                        # Old code added penalty+scheduled to all future balances first,
-                        # then recalculate_from_month added it again → double counting
                         penalty = scheduled * 0.02
                         schedule[next_unpaid - 1].update({
                             "paid_amount": 0,
                             "status": "missed",
-                            # Add penalty to closing balance of this month only
                             "closing_balance": round(
                                 schedule[next_unpaid - 1]["closing_balance"] + penalty, 2)
                         })
@@ -1205,9 +1229,6 @@ def show():
             status_label = ("📌 Next Due"
                             if (r["status"] == "future" and r["month"] == next_unpaid)
                             else STATUS_ICON.get(r["status"], "—"))
-            # FIX 7: Meaningful per-row interest saving vs original projection
-            # Old: bogus formula (diff * rate / 1200 * tenure * 0.5)
-            # New: actual interest component vs what was originally scheduled for that month
             impact = ""
             if r["status"] == "extra" and diff > 0:
                 orig_int   = r.get("original_interest", 0)
