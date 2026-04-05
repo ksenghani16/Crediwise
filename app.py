@@ -1,5 +1,6 @@
 import streamlit as st
 
+
 st.set_page_config(
     page_title="Crediwise — AI Loan Intelligence",
     page_icon="💙",
@@ -19,9 +20,6 @@ html, body, .stApp {
     color: #1a2540;
 }
 
-/* ══════════════════════════════════════
-   SITE-WIDE SOFT BLUE WAVY BACKGROUND
-   ══════════════════════════════════════ */
 .stApp {
     background-color: #daeeff;
     background-image:
@@ -32,26 +30,23 @@ html, body, .stApp {
     background-attachment: fixed;
 }
 
-/* Layered SVG wave overlay — fixed so it scrolls with the page nicely */
 .stApp::before {
     content: '';
     position: fixed;
     inset: 0;
     z-index: 0;
     pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%2390caf9' stop-opacity='0.55'/%3E%3Cstop offset='1' stop-color='%2364b5f6' stop-opacity='0.15'/%3E%3C/linearGradient%3E%3ClinearGradient id='g2' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23bbdefb' stop-opacity='0.4'/%3E%3Cstop offset='1' stop-color='%2390caf9' stop-opacity='0.2'/%3E%3C/linearGradient%3E%3ClinearGradient id='g3' x1='1' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23e3f2fd' stop-opacity='0.6'/%3E%3Cstop offset='1' stop-color='%2390caf9' stop-opacity='0.1'/%3E%3C/linearGradient%3E%3C/defs%3E%3C!-- top wave --%3E%3Cpath d='M0,220 C180,100 380,340 680,200 C980,60 1200,300 1440,180 L1440,0 L0,0 Z' fill='url(%23g1)'/%3E%3C!-- bottom wave --%3E%3Cpath d='M0,680 C240,560 480,780 780,640 C1080,500 1280,720 1440,600 L1440,900 L0,900 Z' fill='url(%23g2)'/%3E%3C!-- mid flowing band --%3E%3Cpath d='M0,460 C200,370 440,570 720,440 C1000,310 1240,510 1440,400 L1440,480 C1240,590 1000,390 720,520 C440,650 200,450 0,540 Z' fill='url(%23g3)'/%3E%3C!-- fine stroke lines --%3E%3Cpath d='M0,340 C220,260 460,440 740,320 C1020,200 1260,400 1440,300' stroke='rgba(100,181,246,0.35)' stroke-width='2.5' fill='none'/%3E%3Cpath d='M0,560 C260,470 520,660 800,530 C1080,400 1300,590 1440,490' stroke='rgba(144,202,249,0.25)' stroke-width='1.8' fill='none'/%3E%3Cpath d='M0,160 C300,90 580,250 880,140 C1180,30 1360,200 1440,130' stroke='rgba(187,222,251,0.4)' stroke-width='1.5' fill='none'/%3E%3C!-- glowing blobs --%3E%3Ccircle cx='120' cy='120' r='160' fill='rgba(144,202,249,0.18)'/%3E%3Ccircle cx='1320' cy='780' r='200' fill='rgba(100,181,246,0.14)'/%3E%3Ccircle cx='720' cy='460' r='130' fill='rgba(187,222,251,0.12)'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%2390caf9' stop-opacity='0.55'/%3E%3Cstop offset='1' stop-color='%2364b5f6' stop-opacity='0.15'/%3E%3C/linearGradient%3E%3ClinearGradient id='g2' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23bbdefb' stop-opacity='0.4'/%3E%3Cstop offset='1' stop-color='%2390caf9' stop-opacity='0.2'/%3E%3C/linearGradient%3E%3ClinearGradient id='g3' x1='1' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23e3f2fd' stop-opacity='0.6'/%3E%3Cstop offset='1' stop-color='%2390caf9' stop-opacity='0.1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0,220 C180,100 380,340 680,200 C980,60 1200,300 1440,180 L1440,0 L0,0 Z' fill='url(%23g1)'/%3E%3Cpath d='M0,680 C240,560 480,780 780,640 C1080,500 1280,720 1440,600 L1440,900 L0,900 Z' fill='url(%23g2)'/%3E%3Cpath d='M0,460 C200,370 440,570 720,440 C1000,310 1240,510 1440,400 L1440,480 C1240,590 1000,390 720,520 C440,650 200,450 0,540 Z' fill='url(%23g3)'/%3E%3Cpath d='M0,340 C220,260 460,440 740,320 C1020,200 1260,400 1440,300' stroke='rgba(100,181,246,0.35)' stroke-width='2.5' fill='none'/%3E%3Cpath d='M0,560 C260,470 520,660 800,530 C1080,400 1300,590 1440,490' stroke='rgba(144,202,249,0.25)' stroke-width='1.8' fill='none'/%3E%3Ccircle cx='120' cy='120' r='160' fill='rgba(144,202,249,0.18)'/%3E%3Ccircle cx='1320' cy='780' r='200' fill='rgba(100,181,246,0.14)'/%3E%3C/svg%3E");
     background-size: cover;
     background-position: center top;
 }
 
-/* Everything sits above the pseudo-element */
 .stApp > * { position: relative; z-index: 1; }
 
 #MainMenu, footer, header { visibility: hidden; }
 section[data-testid="stSidebar"] { display: none; }
 .block-container { padding: 0 !important; max-width: 100% !important; }
 
-/* ── NAV — frosted glass ── */
 .cw-nav {
     background: rgba(255,255,255,0.82);
     backdrop-filter: blur(20px);
@@ -82,7 +77,6 @@ section[data-testid="stSidebar"] { display: none; }
     margin-top: 1px;
 }
 
-/* ── Remove Streamlit default top gap inside columns — fixes nav alignment ── */
 div[data-testid="stColumn"] {
     display: flex !important;
     flex-direction: column !important;
@@ -94,7 +88,6 @@ div[data-testid="stColumn"] > div[data-testid="stVerticalBlockBorderWrapper"]
     padding-top: 0 !important;
 }
 
-/* ── Nav buttons — uniform height, auto width ── */
 div[data-testid="stButton"] > button {
     border-radius: 6px !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
@@ -131,7 +124,6 @@ div[data-testid="stButton"] > button[kind="secondary"]:hover {
     border-color: #64b5f6 !important;
 }
 
-/* Inputs */
 div[data-testid="stTextInput"] input,
 div[data-testid="stNumberInput"] input {
     border-radius: 8px !important;
@@ -165,7 +157,6 @@ div[data-testid="stSlider"] > div { color: #003399 !important; }
 
 hr { border: none; border-top: 1px solid rgba(144,202,249,0.4); margin: 0; }
 
-/* Glass card utility */
 .cw-card {
     background: rgba(255,255,255,0.75);
     backdrop-filter: blur(14px);
@@ -193,7 +184,6 @@ hr { border: none; border-top: 1px solid rgba(144,202,249,0.4); margin: 0; }
     margin-bottom: 0.9rem;
 }
 
-/* ── Auth gate overlay ── */
 .auth-gate {
     text-align: center;
     padding: 5rem 2rem 4rem;
@@ -214,28 +204,25 @@ hr { border: none; border-top: 1px solid rgba(144,202,249,0.4); margin: 0; }
 """, unsafe_allow_html=True)
 
 # ── Session state ──
-for k, v in [("page", "home"), ("form_data", {}), ("logged_in", False), ("username", ""), ("user_email", "")]:
+for k, v in [("page", "home"), ("form_data", {}), ("logged_in", False),
+             ("username", ""), ("user_email", "")]:
     if k not in st.session_state:
         st.session_state[k] = v
 
 # ── Pages that require login ──
-PROTECTED_PAGES = {"calculator", "dashboard"}
+PROTECTED_PAGES = {"calculator", "dashboard", "profile"}
 
-# ── Public pages (no login needed) ──
-PUBLIC_PAGES = {"home", "about", "contact", "feedback", "login", "signup"}
-
-# ── Auth guard: redirect to login if trying to access a protected page ──
+# ── Auth guard ──
 if st.session_state.page in PROTECTED_PAGES and not st.session_state.logged_in:
-    # Store where they were trying to go so we can redirect after login
     st.session_state["_redirect_after_login"] = st.session_state.page
     st.session_state.page = "_auth_gate"
 
-# ── NAVBAR — single flat row so all buttons share the same baseline ──
+# ── NAVBAR ──
 active = st.session_state.page
 
 if st.session_state.logged_in:
     (col_logo, c1, c2, c3, c4, c5, c6,
-     _gap, col_user, col_logout) = st.columns([2.2, 1.15, 1.25, 1.25, 1.0, 1.1, 1.1, 0.3, 1.5, 1.0])
+     _gap, col_profile, col_logout) = st.columns([2.2, 1.15, 1.25, 1.25, 1.0, 1.1, 1.1, 0.3, 1.5, 1.0])
 else:
     (col_logo, c1, c2, c3, c4, c5, c6,
      _gap, col_login, col_signup) = st.columns([2.2, 1.15, 1.25, 1.25, 1.0, 1.1, 1.1, 0.3, 1.0, 1.0])
@@ -267,16 +254,17 @@ for col, (label, pg) in zip([c1, c2, c3, c4, c5, c6], pages):
         st.rerun()
 
 if st.session_state.logged_in:
-    col_user.markdown(
-        f"<div style='display:flex;align-items:center;justify-content:flex-end;"
-        f"height:100%;min-height:38px;font-size:0.82rem;font-weight:600;"
-        f"color:#003399;white-space:nowrap;'>👤 {st.session_state.username}</div>",
-        unsafe_allow_html=True,
-    )
+    # Profile button shows user's name — clicking goes to profile page
+    profile_label = f"👤 {st.session_state.username}"
+    if col_profile.button(profile_label, key="nav_profile", use_container_width=True,
+                          type="primary" if active == "profile" else "secondary"):
+        st.session_state.page = "profile"
+        st.rerun()
     if col_logout.button("Logout", key="nav_logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.username = ""
-        st.session_state.page = "home"
+        st.session_state.logged_in  = False
+        st.session_state.username   = ""
+        st.session_state.user_email = ""
+        st.session_state.page       = "home"
         st.rerun()
 else:
     if col_login.button("Login", key="nav_login", use_container_width=True, type="secondary"):
@@ -292,9 +280,9 @@ st.markdown("<hr>", unsafe_allow_html=True)
 pg = st.session_state.page
 
 if pg == "_auth_gate":
-    # ── Friendly auth gate screen ──
     destination = st.session_state.get("_redirect_after_login", "calculator")
-    dest_label = {"calculator": "Loan Calculator", "dashboard": "Dashboard"}.get(destination, destination.capitalize())
+    dest_label  = {"calculator": "Loan Calculator", "dashboard": "Dashboard",
+                   "profile": "Profile"}.get(destination, destination.capitalize())
 
     st.markdown(f"""
     <div class="auth-gate">
@@ -341,3 +329,5 @@ elif pg == "login":
     from pages.login import show; show()
 elif pg == "signup":
     from pages.signup import show; show()
+elif pg == "profile":
+    from pages.profile import show; show()
