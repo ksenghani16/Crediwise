@@ -2,7 +2,7 @@ import re
 import streamlit as st
 from utils.auth_db import init_db, register_user, validate_password, email_exists
 
-init_db()   # no-op if table already exists
+init_db()
 
 
 def _pw_strength_ui(password: str):
@@ -11,15 +11,14 @@ def _pw_strength_ui(password: str):
         return
 
     rules = [
-        ("8+ characters",          len(password) >= 8),
-        ("Uppercase letter",        bool(re.search(r"[A-Z]", password))),
-        ("Lowercase letter",        bool(re.search(r"[a-z]", password))),
-        ("Number (0–9)",            bool(re.search(r"\d",    password))),
-        ("Special character",       bool(re.search(r'[!@#$%^&*()\-_=+\[\]{};:\'",.<>?/\\|`~]', password))),
+        ("8+ characters",    len(password) >= 8),
+        ("Uppercase letter",  bool(re.search(r"[A-Z]", password))),
+        ("Lowercase letter",  bool(re.search(r"[a-z]", password))),
+        ("Number (0–9)",      bool(re.search(r"\d",    password))),
+        ("Special character", bool(re.search(r'[!@#$%^&*()\-_=+\[\]{};:\'",.<>?/\\|`~]', password))),
     ]
     passed = sum(1 for _, ok in rules if ok)
 
-    # Bar colour
     if passed <= 2:
         bar_color, strength_label = "#ef4444", "Weak"
     elif passed <= 3:
@@ -56,6 +55,28 @@ def _pw_strength_ui(password: str):
 
 
 def show():
+    # ── OAuth callback — MUST BE FIRST ────────────────────────────────────
+    params = st.query_params
+    if "code" in params and params.get("state", "") == "google_oauth_signup":
+        with st.spinner("Creating your account with Google..."):
+            try:
+                from utils.oauth_handler import handle_google_callback, oauth_login_or_register
+                ok_cb, msg_cb, user_data = handle_google_callback(params["code"])
+                st.query_params.clear()
+                if ok_cb:
+                    ok_reg, msg_reg = oauth_login_or_register(user_data)
+                    if ok_reg:
+                        st.session_state.page = "calculator"
+                        st.rerun()
+                    else:
+                        st.error(f"Sign-up error: {msg_reg}")
+                else:
+                    st.error(f"Google sign-up failed: {msg_cb}")
+            except ImportError:
+                st.error("OAuth handler not found. Make sure utils/oauth_handler.py exists.")
+        st.stop()
+
+    # ── Styles ─────────────────────────────────────────────────────────────
     st.markdown("""
     <style>
     .auth-logo { font-family:'Merriweather',serif; font-size:1.5rem; font-weight:900;
@@ -85,15 +106,7 @@ def show():
     .auth-divider::before,.auth-divider::after {
         content:''; flex:1; height:1px; background:rgba(144,202,249,0.5);
     }
-    .social-btn {
-        display:flex; align-items:center; justify-content:center; gap:0.7rem;
-        background:rgba(255,255,255,0.7); border:1.5px solid rgba(144,202,249,0.5);
-        border-radius:10px; padding:0.6rem; font-size:0.86rem; font-weight:600; color:#1a2540;
-        cursor:pointer; margin-bottom:0.6rem; width:100%;
-    }
-    .social-btn:hover { border-color:#003399; background:rgba(240,248,255,0.9); }
 
-    /* Benefits left panel */
     .benefits-panel {
         background: linear-gradient(145deg,#002880,#003399 50%,#0044bb);
         border-radius:20px; padding:2.2rem 2rem 2rem;
@@ -125,6 +138,53 @@ def show():
         border-top:1px solid rgba(255,255,255,0.13); padding-top:1rem; margin-top:1.2rem;
         font-size:0.74rem; color:rgba(255,255,255,0.5); text-align:center; position:relative;
     }
+
+    .pw-match-ok  { color:#15803d; font-size:0.78rem; font-weight:700; margin-top:4px; }
+    .pw-match-err { color:#dc2626; font-size:0.78rem; font-weight:700; margin-top:4px; }
+
+    /* Google button — pure CSS hover, no JS required */
+    .google-btn-link {
+        display: block;
+        text-decoration: none !important;
+        margin-bottom: 1rem;
+        color: inherit !important;
+    }
+    .google-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        background: #fff;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0.65rem 1rem;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1a2540;
+        cursor: pointer;
+        width: 100%;
+        box-sizing: border-box;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .google-btn:hover {
+        border-color: #4285F4;
+        box-shadow: 0 2px 10px rgba(66,133,244,0.2);
+    }
+    .google-btn-disabled {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        background: #f8faff;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0.65rem 1rem;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #94a3b8;
+        cursor: not-allowed;
+        margin-bottom: 1rem;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -132,6 +192,7 @@ def show():
 
     left_col, right_col = st.columns([1, 1.1], gap="large")
 
+    # ── Benefits panel ────────────────────────────────────────────────────
     with left_col:
         st.markdown("""
         <div class="benefits-panel">
@@ -161,29 +222,55 @@ def show():
             <div class="benefit-row">
                 <div class="benefit-icon">&#128274;</div>
                 <div>
-                    <div class="benefit-title">100% Secure</div>
-                    <div class="benefit-desc">Your data is never stored or sold.</div>
+                    <div class="benefit-title">Bank-Grade Security</div>
+                    <div class="benefit-desc">256-bit SSL. Your data never leaves your session.</div>
                 </div>
             </div>
-            <div class="benefit-row">
-                <div class="benefit-icon">&#9989;</div>
-                <div>
-                    <div class="benefit-title">No Credit Impact</div>
-                    <div class="benefit-desc">Soft check only — CIBIL safe always.</div>
-                </div>
-            </div>
-            <div class="bp-footer">&#128274; 256-bit SSL &nbsp;&middot;&nbsp; &#9989; RBI Compliant &nbsp;&middot;&nbsp; &#127470;&#127475; Made in India</div>
+            <div class="bp-footer">&#127470;&#127475; Trusted by Indian borrowers &nbsp;&middot;&nbsp; RBI Compliant</div>
         </div>
         """, unsafe_allow_html=True)
 
+    # ── Sign-up form ──────────────────────────────────────────────────────
     with right_col:
         st.markdown("""
         <div class="auth-logo">Credi<span>wise</span></div>
         <div class="auth-tagline">Create Your Free Account</div>
-        <div class="social-btn">&#128309; Sign up with Google</div>
-        <div class="social-btn">&#128312; Sign up with Microsoft</div>
-        <div class="auth-divider">or sign up with email</div>
         """, unsafe_allow_html=True)
+
+        # ── Google OAuth button ──
+        try:
+            from utils.oauth_handler import get_google_auth_url
+            google_url = get_google_auth_url(state="google_oauth_signup")
+        except ImportError:
+            google_url = None
+
+        _svg = (
+            '<svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">'
+            '<path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0'
+            ' 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>'
+            '<path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96'
+            '-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>'
+            '<path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59'
+            'l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>'
+            '<path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45'
+            '-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>'
+            '</svg>'
+        )
+
+        if google_url:
+            st.markdown(
+                f'<a href="{google_url}" target="_self" class="google-btn-link">'
+                f'<div class="google-btn">{_svg}Sign up with Google</div>'
+                f'</a>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f'<div class="google-btn-disabled">{_svg}Sign up with Google (not configured)</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown('<div class="auth-divider">or sign up with email</div>', unsafe_allow_html=True)
 
         if "signup_step" not in st.session_state:
             st.session_state.signup_step = 1
@@ -202,7 +289,7 @@ def show():
         </div>
         """, unsafe_allow_html=True)
 
-        # ── STEP 1: Personal details ──────────────────────────────────────────
+        # ── STEP 1 ──
         if step == 1:
             with st.form("signup_step1"):
                 fn_col, ln_col = st.columns(2)
@@ -223,15 +310,14 @@ def show():
                     if not email or "@" not in email or "." not in email.split("@")[-1]:
                         errors.append("Enter a valid email address.")
                     digits = re.sub(r"[\s\-+()]", "", phone)
-                    # Strip country code prefix +91 or 0 if present, then expect 10 digits
                     digits = re.sub(r"^(91|0)(?=\d{10}$)", "", digits)
                     if not re.fullmatch(r"[6-9]\d{9}", digits):
-                        errors.append("Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.")
+                        errors.append("Enter a valid 10-digit Indian mobile number starting with 6–9.")
                     if errors:
                         for e in errors:
                             st.error(e)
                     elif email_exists(email):
-                        st.error("An account with this email already exists. Please log in.")
+                        st.error("🔒 An account with this email already exists. Please log in.")
                     else:
                         st.session_state["_su_first"] = first_name
                         st.session_state["_su_last"]  = last_name
@@ -241,9 +327,8 @@ def show():
                         st.session_state.signup_step  = 2
                         st.rerun()
 
-        # ── STEP 2: Password + terms ──────────────────────────────────────────
+        # ── STEP 2 ──
         elif step == 2:
-            # Live password strength (outside form so it updates as user types)
             live_pw = st.text_input(
                 "Create Password *",
                 type="password",
@@ -252,40 +337,44 @@ def show():
             )
             _pw_strength_ui(live_pw)
 
+            live_confirm = st.text_input(
+                "Confirm Password *",
+                type="password",
+                placeholder="Repeat your password",
+                key="live_confirm_field",
+            )
+
+            if live_confirm:
+                if live_pw == live_confirm:
+                    st.markdown('<div class="pw-match-ok">✓ Passwords match</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown('<div class="pw-match-err">✗ Passwords do not match</div>', unsafe_allow_html=True)
+
             with st.form("signup_step2"):
-                # Hidden re-entry — user types again inside the form for confirmation
-                confirm = st.text_input(
-                    "Confirm Password *",
-                    type="password",
-                    placeholder="Repeat your password",
-                )
-                pan   = st.text_input(
+                pan = st.text_input(
                     "PAN Number (optional)",
                     placeholder="ABCDE1234F — for faster analysis",
                 )
                 terms   = st.checkbox("I agree to the Terms of Service and Privacy Policy *")
-                updates = st.checkbox("Send me loan eligibility tips (optional)")
+                st.checkbox("Send me loan eligibility tips (optional)")
 
                 sub_col, back_col = st.columns([2, 1])
-                submitted = sub_col.form_submit_button(
-                    "Create Account 🚀", use_container_width=True, type="primary"
-                )
-                go_back = back_col.form_submit_button("← Back", use_container_width=True)
+                submitted = sub_col.form_submit_button("Create Account 🚀", use_container_width=True, type="primary")
+                go_back   = back_col.form_submit_button("← Back", use_container_width=True)
 
                 if go_back:
                     st.session_state.signup_step = 1
                     st.rerun()
 
                 if submitted:
-                    # Pull the live field value (form re-renders it blank, so
-                    # we stored it in session state via the key above)
                     password = st.session_state.get("live_password_field", "")
+                    confirm  = st.session_state.get("live_confirm_field", "")
 
                     errs = validate_password(password)
                     if errs:
                         st.error("Password requirements not met:\n• " + "\n• ".join(errs))
                     elif password != confirm:
-                        st.error("Passwords do not match. Please re-enter.")
+                        st.error("🔒 Passwords do not match. Please re-enter your password.")
                     elif not terms:
                         st.warning("Please accept the Terms of Service to continue.")
                     else:
@@ -304,14 +393,15 @@ def show():
                             st.session_state.username    = name.capitalize()
                             st.session_state.user_email  = st.session_state.get("_su_email", "")
                             st.session_state.signup_step = 1
-                            # Clean up temp keys
-                            for k in ("_su_first","_su_last","_su_email","_su_phone","_su_city"):
+                            for k in ("_su_first", "_su_last", "_su_email",
+                                      "_su_phone", "_su_city",
+                                      "live_password_field", "live_confirm_field"):
                                 st.session_state.pop(k, None)
-                            st.success(f"Welcome to Crediwise, {name}! Your account is ready.")
+                            st.success(f"🎉 Welcome to Crediwise, {name}! Your account is ready.")
                             st.session_state.page = "calculator"
                             st.rerun()
                         else:
-                            st.error(msg)
+                            st.error(f"❌ {msg}")
 
         st.markdown(
             '<div style="text-align:center;font-size:0.83rem;'
