@@ -195,6 +195,48 @@ def show():
     </style>
     """, unsafe_allow_html=True)
 
+    # ── PERSONALISED GREETING ─────────────────────────────────────────────────
+    if st.session_state.get("logged_in") and st.session_state.get("username"):
+        name = st.session_state.username
+        hour = __import__("datetime").datetime.now().hour
+        time_greet = "Good morning" if hour < 12 else "Good afternoon" if hour < 17 else "Good evening"
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(120deg, rgba(0,51,153,0.07), rgba(100,181,246,0.10));
+            border: 1px solid rgba(144,202,249,0.5);
+            border-radius: 16px;
+            padding: 1rem 1.8rem;
+            margin: 1.2rem 2.5rem 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(10px);
+        ">
+            <div style="display:flex;align-items:center;gap:0.9rem;">
+                <div style="width:42px;height:42px;border-radius:50%;
+                            background:linear-gradient(135deg,#003399,#0040cc);
+                            display:flex;align-items:center;justify-content:center;
+                            font-size:1.1rem;color:#fff;font-weight:800;flex-shrink:0;">
+                    {name[0].upper()}
+                </div>
+                <div>
+                    <div style="font-family:'Merriweather',serif;font-size:1.05rem;
+                                font-weight:900;color:#1a2540;">
+                        {time_greet}, {name}! 👋
+                    </div>
+                    <div style="font-size:0.78rem;color:#64748b;margin-top:1px;">
+                        Welcome back to Crediwise — your loan analysis is ready whenever you are.
+                    </div>
+                </div>
+            </div>
+            <div style="font-size:0.78rem;color:#003399;font-weight:700;
+                        background:rgba(0,51,153,0.08);border:1px solid rgba(0,51,153,0.18);
+                        border-radius:100px;padding:0.3rem 1rem;white-space:nowrap;">
+                ✅ Logged in
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     # ── HERO ──
     hero_l, hero_r = st.columns([1.1, 0.9])
 
