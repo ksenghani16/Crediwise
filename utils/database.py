@@ -12,6 +12,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
+            user_email TEXT DEFAULT '',
             income REAL,
             expenses REAL,
             existing_emi REAL,
@@ -26,18 +27,29 @@ def init_db():
             max_loan REAL
         )
     """)
+    # Add user_email column to existing DBs that don't have it yet
+    try:
+        c.execute("ALTER TABLE sessions ADD COLUMN user_email TEXT DEFAULT ''")
+    except Exception:
+        pass  # Column already exists — fine
     conn.commit()
     conn.close()
 
-def save_session(data: dict, risk_score: int, risk_level: str, emi: float, safe_emi: float, max_loan: float):
+def save_session(data: dict, risk_score: int, risk_level: str, emi: float,
+                 safe_emi: float, max_loan: float, user_email: str = ""):
     init_db()
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO sessions (timestamp, income, expenses, existing_emi, loan_amount, tenure, interest_rate, credit_score, risk_score, risk_level, emi, safe_emi, max_loan)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (
+            timestamp, user_email, income, expenses, existing_emi,
+            loan_amount, tenure, interest_rate, credit_score,
+            risk_score, risk_level, emi, safe_emi, max_loan
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         datetime.now().isoformat(),
+        user_email,
         data.get("income"), data.get("expenses"), data.get("existing_emi"),
         data.get("loan_amount"), data.get("tenure"), data.get("interest_rate"),
         data.get("credit_score"), risk_score, risk_level, emi, safe_emi, max_loan
