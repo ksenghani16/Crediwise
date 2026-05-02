@@ -56,16 +56,6 @@ This project delivers a modern personal finance tool with:
    ```
 3. Open the displayed local URL in your browser.
 
-## Resume-Ready Description
-
-**Crediwise — AI Loan Intelligence** is a Streamlit-based financial advisory dashboard I developed to evaluate loan affordability and credit risk using both rule-based heuristics and machine learning. The application includes personalized EMI planning, adaptive risk scoring, report generation, and an end-to-end model training pipeline.
-
-### Resume bullet examples
-
-- Built `Crediwise`, a Streamlit-driven loan advisory platform that calculates EMI, recommends safer loan plans, and predicts borrower risk using a hybrid rule-based and ML scoring engine.
-- Designed and implemented a credit risk model training pipeline with `scikit-learn`, producing a deployable `RandomForestClassifier` for real-time loan risk assessment.
-- Developed intuitive dashboard pages, visualizations, and report generation features for an enhanced borrower experience.
-
 ## Notes
 
 - Place `credit_risk_dataset.csv` in `model/` and run `python model/train_model.py` to generate `loan_risk_model.pkl`.
